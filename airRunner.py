@@ -10,7 +10,7 @@ from logAnalysis import myLogAnalysis, MakeAllLogData
 import os
 import shutil
 
-from prefDog.startService import PerfdogService
+from startService import PerfdogService
 
 class PlatForm(Enum):
     Android = 1,
@@ -117,6 +117,7 @@ class myAirRunner():
     PrefToolPath = ""
     token = ""
     device = ""
+    deviceUUid = ""
     prefDogLogPath = ""
     modelList = []
     airtestLogRoot = ""
@@ -134,6 +135,7 @@ class myAirRunner():
         self.airtestLogRoot = airtestLogRoot
         self.airtestScriptRoot = airtestScriptRoot
         self.runPref = runPref
+        self.deviceUUid = device
         if platform == PlatForm.Android:
             self.device = "Android:" + device
         elif platform == PlatForm.IOS:
@@ -145,7 +147,7 @@ class myAirRunner():
         self.modelList = json.loads(ModelList)
 
         if self.runPref:
-            self.prefObj = PerfdogService(self.package,self.PrefToolPath,self.token,PrefTestName,self.device,self.prefDogLogPath)
+            self.prefObj = PerfdogService(self.package,self.PrefToolPath,self.token,PrefTestName,self.deviceUUid,self.prefDogLogPath)
             self.prefObj.initService()
             self.prefObj.startPerf()
 
