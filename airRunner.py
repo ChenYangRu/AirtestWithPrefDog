@@ -6,11 +6,11 @@ from argparse import *
 
 from airtest.core.api import stop_app, start_app, connect_device
 
-from logAnalysis import myLogAnalysis, MakeAllLogData
+from .logAnalysis import myLogAnalysis, MakeAllLogData
 import os
 import shutil
 
-from startService import PerfdogService
+from .startService import PerfdogService
 
 class PlatForm(Enum):
     Android = 1,

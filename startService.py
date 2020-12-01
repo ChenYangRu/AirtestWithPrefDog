@@ -5,7 +5,8 @@ import traceback
 
 import grpc
 
-import perfdog_pb2, perfdog_pb2_grpc
+from . import perfdog_pb2, perfdog_pb2_grpc
+
 
 class PerfdogService():
     packageName = ''
