@@ -10,7 +10,8 @@ from .logAnalysis import myLogAnalysis, MakeAllLogData
 import os
 import shutil
 
-from .startService import PerfdogService
+from .startService import PerfdogService, SaveFormat
+
 
 class PlatForm(Enum):
     Android = 1,
@@ -99,7 +100,7 @@ class airRunner(AirtestCase):
                 result['infos'] = datas
                 result['mustPass'] = model['MustPass']
                 results.append(result)
-                print("Result :L ",result['result'])
+                print("Result :  ",result['result'])
                 if model['MustPass'] == True and result['result'] == False :
                     print("当前模块 【%s】 未通过 后续模块不执行" % modelName)
                     mark["AllPass"] = False
@@ -114,61 +115,98 @@ class airRunner(AirtestCase):
 
 class myAirRunner():
     package = ""
-    PrefToolPath = ""
+    PerfToolPath = ""
     token = ""
     device = ""
     deviceUUid = ""
-    prefDogLogPath = ""
+    perfDogLogPath = ""
     modelList = []
     airtestLogRoot = ""
     airtestScriptRoot = ""
-    runPref = False
-    prefDogLogPath = ""
-    prefObj = None
 
-    def __init__(self,package,platform,device,airtestLogRoot,airtestScriptRoot,runPref = False,preftool ="",prefToken ="",prefDogLogPath = ""):
+    perfObj = None
+
+    def __init__(self,package,platform,device,airtestLogRoot,airtestScriptRoot,perftool ="",perfToken ="",perfDogLogPath = ""):
+        """
+        :param package: 测试项目的包名
+        :param platform: 所需测试的设备平台
+        :param device: 所需测试的设备号
+        :param airtestLogRoot: airtest测试Log日志文件保存位置
+        :param airtestScriptRoot: airtest测试脚本根目录
+        :param perftool: 性能狗Service 所在本地目录
+        :param perfToken: 性能狗Service 令牌
+        :param perfDogLogPath: 性能狗 数据日志保存目录
+        """
         self.package = package
-        self.PrefToolPath = preftool
-        self.token = prefToken
-
-        self.prefDogLogPath = prefDogLogPath
+        self.PerfToolPath = perftool
+        self.token = perfToken
+        self.perfDogLogPath = perfDogLogPath
         self.airtestLogRoot = airtestLogRoot
         self.airtestScriptRoot = airtestScriptRoot
-        self.runPref = runPref
         self.deviceUUid = device
+
         if platform == PlatForm.Android:
             self.device = "Android:" + device
         elif platform == PlatForm.IOS:
             self.device = "iOS:" + device
 
+    def CheckPrefInit(self):
+        if self.token == None or self.token == "":
+            return "PrefDog 初始化验证失败：Token信息缺失"
+        if self.package == None or self.package == "":
+            return "PrefDog 初始化验证失败：package信息缺失"
+        if self.PerfToolPath == None or self.PerfToolPath == "":
+            return "PrefDog 初始化验证失败：PrefToolPath信息缺失"
+        if self.deviceUUid == None or self.deviceUUid == "":
+            return "PrefDog 初始化验证失败：deviceUUid信息缺失"
+        if self.perfDogLogPath == None or self.perfDogLogPath == "":
+            return "PrefDog 初始化验证失败：prefDogLogPath信息缺失"
 
+        return ""
 
-    def RunAirWithModelList(self,ModelList,PrefTestName):
+    def RunAirWithModelList(self,ModelList,PerfTestName,SaveLogFile ,runPerf,perfdogSaveFormat=SaveFormat.ALL,perfDogUploadServer = True):
+        """
+        :param ModelList: 需要运行的测试模块JSON 数据
+        :param PerfTestName: 性能测试的测试名称
+        :param SaveLogFile: 是否需要保存airtest 测试文本数据
+        :param runPerf: 是否运行性能狗测试
+        :param perfdogSaveFormat: 性能狗测试数据保存格式
+        :param perfDogUploadServer: 性能狗测试数据是否上传性能狗网站
+        """
         self.modelList = json.loads(ModelList)
 
-        if self.runPref:
-            self.prefObj = PerfdogService(self.package,self.PrefToolPath,self.token,PrefTestName,self.deviceUUid,self.prefDogLogPath)
-            self.prefObj.initService()
-            self.prefObj.startPerf()
+        if runPerf:
+            err = self.CheckPrefInit()
+            if err == "":
+                self.perfObj = PerfdogService(self.package,self.PerfToolPath,self.token,self.deviceUUid,self.perfDogLogPath,PerfTestName,perfdogSaveFormat,perfDogUploadServer)
+                self.perfObj.initService()
+                self.perfObj.startPerf()
+            else:
+                raise "无法进行性能测试 ："+err
 
         Runner = airRunner()
         Runner.stopApp(self.package,self.device)
         Runner.startApp(self.package,self.device)
 
-        results,ErrOut = Runner.run_air(self.airtestScriptRoot,self.airtestLogRoot,self.modelList,self.device,self.prefObj,self.runPref)
-        if self.runPref:
-            self.prefObj.StopPerf()
+        results,ErrOut = Runner.run_air(self.airtestScriptRoot,self.airtestLogRoot,self.modelList,self.device,self.perfObj,runPerf)
+        if runPerf:
+            self.perfObj.StopPerf()
         data = json.dumps(results)
-        saveFile = os.path.join(self.airtestLogRoot, "Resultdata.json")
-        with open(saveFile, 'w') as f:
-            f.write(data)
-        f.close()
+        if SaveLogFile:
+            saveFile = os.path.join(self.airtestLogRoot, "Resultdata.json")
+            with open(saveFile, 'w') as f:
+                f.write(data)
+            f.close()
 
-        MakeAllLogData(self.modelList, self.airtestScriptRoot, self.airtestLogRoot,self.airtestLogRoot)
+            #MakeAllLogData(self.modelList, self.airtestScriptRoot, self.airtestLogRoot,self.airtestLogRoot)
+            print("AirtestLogPath: ",self.airtestLogRoot)
+
+        if runPerf:
+            print("prefDogLogPath: ", self.perfDogLogPath)
+
         print("Test Over")
-        print("AirtestLogPath: ",self.airtestLogRoot)
-        print("prefDogLogPath: ", self.prefDogLogPath)
         print("ErrOut :  ",ErrOut)
+
         if ErrOut:
             Runner.stopApp(self.package,self.device)
 

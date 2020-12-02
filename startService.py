@@ -2,11 +2,17 @@ import subprocess
 import threading
 import time
 import traceback
+from enum import Enum
 
 import grpc
 
 from . import perfdog_pb2, perfdog_pb2_grpc
 
+class SaveFormat(Enum):
+    NONE = 0,
+    JSON = 1,
+    PB = 2,
+    ALL = 3,
 
 class PerfdogService():
     packageName = ''
@@ -16,16 +22,29 @@ class PerfdogService():
     device = None
     caseName = ''
     deviceUuid = ''
-    saveJsonPath = './perfdog_service_output'
+    saveformat = SaveFormat.ALL
+    uploadServer = True
+    saveJsonPath = ''
 
-    def __init__(self,packageName,perfdogPath,token,casename,deviceuuid,saveJsonPath='./perfdog_service_output'):
+    def __init__(self,packageName,perfdogPath,token,deviceuuid,saveJsonPath,casename,saveFormat,UploadServer):
+        """
+        :param packageName: 测试包的包名
+        :param perfdogPath: 性能狗Service 本地目录
+        :param token: 性能狗Service 令牌
+        :param deviceuuid: 需要测试的设备id
+        :param saveJsonPath: 测试数据保存的本地位置
+        :param casename: 当此测试名
+        :param saveFormat: 测试数据保存格式
+        :param UploadServer: 测试数据是否上传性能狗网站
+        """
         self.packageName = packageName
         self.PerfdogPath = perfdogPath
         self.Token = token
         self.caseName = casename
         self.deviceUuid = deviceuuid
         self.saveJsonPath = saveJsonPath
-
+        self.saveformat = saveFormat
+        self.uploadServer = UploadServer
 
     def initService(self):
         try:
@@ -108,32 +127,67 @@ class PerfdogService():
 
     def SaveJSON(self):
         try:
-            print("12.上传和导出所有数据")
-            saveResult = self.stub.saveData(perfdog_pb2.SaveDataReq(
-                device=self.device,
-                caseName=self.caseName,  # web上case和excel的名字
-                uploadToServer=True,  # 上传到perfdog服务器
-                exportToFile=True,  # 保存到本地
-                outputDirectory=self.saveJsonPath,
-                dataExportFormat=perfdog_pb2.EXPORT_TO_JSON
-            ))
-            print("保存结果:\n", saveResult)
-            print("12.上传和导出所有数据")
-            saveResult = self.stub.saveData(perfdog_pb2.SaveDataReq(
-                device=self.device,
-                caseName=self.caseName,  # web上case和excel的名字
-                uploadToServer=True,  # 上传到perfdog服务器
-                exportToFile=True,  # 保存到本地
-                outputDirectory=self.saveJsonPath,
-                dataExportFormat=perfdog_pb2.EXPORT_TO_PROTOBUF
-            ))
-            print("保存结果:\n", saveResult)
+            str = "导出所有数据"
+            if self.uploadServer:
+                str = '上传' + str
+            if self.saveformat == SaveFormat.NONE:
+                print("PrefDog 数据保存格式为 NONE 不保存,不上传")
+            elif self.saveformat == SaveFormat.ALL:
+                print("12.%s ----JSON" % str)
+                saveResult = self.stub.saveData(perfdog_pb2.SaveDataReq(
+                    device=self.device,
+                    caseName=self.caseName,  # web上case和excel的名字
+                    uploadToServer=self.uploadServer,  # 上传到perfdog服务器
+                    exportToFile=True,  # 保存到本地
+                    outputDirectory=self.saveJsonPath,
+                    dataExportFormat=perfdog_pb2.EXPORT_TO_JSON
+                ))
+                print("保存结果 ----JSON :\n", saveResult)
+                self.uploadServer = False
+
+                print("12.%s ----PB" % str)
+                saveResult = self.stub.saveData(perfdog_pb2.SaveDataReq(
+                    device=self.device,
+                    caseName=self.caseName,  # web上case和excel的名字
+                    uploadToServer=self.uploadServer,  # 上传到perfdog服务器
+                    exportToFile=True,  # 保存到本地
+                    outputDirectory=self.saveJsonPath,
+                    dataExportFormat=perfdog_pb2.EXPORT_TO_PROTOBUF
+                ))
+                print("保存结果----PB:\n", saveResult)
+            else:
+                if self.saveformat == SaveFormat.JSON:
+                    print("12.%s ----JSON" % str)
+                    saveResult = self.stub.saveData(perfdog_pb2.SaveDataReq(
+                        device=self.device,
+                        caseName=self.caseName,  # web上case和excel的名字
+                        uploadToServer=self.uploadServer,  # 上传到perfdog服务器
+                        exportToFile=True,  # 保存到本地
+                        outputDirectory=self.saveJsonPath,
+                        dataExportFormat=perfdog_pb2.EXPORT_TO_JSON
+                    ))
+                    print("保存结果----JSON:\n", saveResult)
+                if self.saveformat == SaveFormat.PB:
+                    print("12.%s ----PB" % str)
+                    saveResult = self.stub.saveData(perfdog_pb2.SaveDataReq(
+                        device=self.device,
+                        caseName=self.caseName,  # web上case和excel的名字
+                        uploadToServer=self.uploadServer,  # 上传到perfdog服务器
+                        exportToFile=True,  # 保存到本地
+                        outputDirectory=self.saveJsonPath,
+                        dataExportFormat=perfdog_pb2.EXPORT_TO_PROTOBUF
+                    ))
+                    print("保存结果----PB:\n", saveResult)
         except Exception as e:
             traceback.print_exc()
 
     def StopPerf(self):
         try:
-            self.SaveJSON()
+
+            if self.saveformat != SaveFormat.NONE:
+                self.SaveJSON()
+            else:
+                print("保存格式为NONE 不保存为文件")
             print("13.停止测试")
             self.stub.stopTest(perfdog_pb2.StopTestReq(device=self.device))
             print("over")
