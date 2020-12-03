@@ -323,6 +323,17 @@ class myLogAnalysis(object):
         # data['data'] = info
         return data
 
+def MakeAllReport(ModelList, script_root, log_Root, savePath):
+    reportPath = savePath + "/Report/"
+    modellist = json.loads(ModelList)
+    for model in modellist:
+        modelName = model['modelName']
+        script = os.path.join(script_root, modelName + '.air')
+        logroot = os.path.join(log_Root, modelName)
+        os.system("airtest report %s --log_root %s --outfile log.html --lang zh --export %s" % (script,
+                                                                                                    logroot, reportPath))
+
+
 def MakeAllLogData(ModelList,script_root,log_Root,savePath):
 
     results = [];
