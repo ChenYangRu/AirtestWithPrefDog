@@ -44,7 +44,7 @@ class airRunner(AirtestCase):
             connect_device(device)
         start_app(package)
 
-    def run_air(self,root_script,log_root,ModelList,device,prefObj = None,runPref = False):
+    def run_air(self,root_script,log_root,ModelList,device,prefObj = None,runPref = False,resetpath = False):
         # param  root_dir  脚本集合根目录
         # param  device    设备列表
 
@@ -92,7 +92,7 @@ class airRunner(AirtestCase):
             except:
                 pass
             finally:
-                mylog = myLogAnalysis(script,log,"log.txt",modelName)
+                mylog = myLogAnalysis(script,log,"log.txt",modelName,resetpath)
                 datas = mylog.makeData()
                 result = {}
                 result['name'] = airName.replace('.air','')
@@ -123,10 +123,10 @@ class myAirRunner():
     modelList = []
     airtestLogRoot = ""
     airtestScriptRoot = ""
-
+    resetPath = False
     perfObj = None
 
-    def __init__(self,package,platform,device,airtestLogRoot,airtestScriptRoot,perftool ="",perfToken ="",perfDogLogPath = ""):
+    def __init__(self,package,platform,device,airtestLogRoot,airtestScriptRoot,perftool ="",perfToken ="",perfDogLogPath = "",resetpath = False):
         """
         :param package: 测试项目的包名
         :param platform: 所需测试的设备平台
@@ -136,6 +136,7 @@ class myAirRunner():
         :param perftool: 性能狗Service 所在本地目录
         :param perfToken: 性能狗Service 令牌
         :param perfDogLogPath: 性能狗 数据日志保存目录
+        :param resetpath: 重新配置路径，去掉绝对路径部分
         """
         self.package = package
         self.PerfToolPath = perftool
@@ -144,6 +145,8 @@ class myAirRunner():
         self.airtestLogRoot = airtestLogRoot
         self.airtestScriptRoot = airtestScriptRoot
         self.deviceUUid = device
+        self.resetPath = resetpath
+
 
         if platform == PlatForm.Android:
             self.device = "Android:" + device
@@ -185,10 +188,11 @@ class myAirRunner():
                 raise "无法进行性能测试 ："+err
 
         Runner = airRunner()
+
         Runner.stopApp(self.package,self.device)
         Runner.startApp(self.package,self.device)
 
-        results,ErrOut = Runner.run_air(self.airtestScriptRoot,self.airtestLogRoot,self.modelList,self.device,self.perfObj,runPerf)
+        results,ErrOut = Runner.run_air(self.airtestScriptRoot,self.airtestLogRoot,self.modelList,self.device,self.perfObj,runPerf,self.resetPath)
         if runPerf:
             self.perfObj.StopPerf()
         data = json.dumps(results)

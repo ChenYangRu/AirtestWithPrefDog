@@ -87,7 +87,8 @@ class PerfdogService():
             appList = self.stub.getAppList(self.device)
             apps = appList.app
             app = self.selectApp(apps)
-
+            if app == None:
+                raise "未获取 %s 信息" % self.packageName
             print("7.获取设备的详细信息")
             deviceInfo = self.stub.getDeviceInfo(self.device)
             print("8.开启性能数据项")

@@ -20,7 +20,7 @@ LOGGING = get_logger(__name__)
 LOGDIR = "log"
 
 class myLogAnalysis(object):
-    def __init__(self,script_root,log_root,logfile,ModelName):
+    def __init__(self,script_root,log_root,logfile,ModelName,NeedRestPath):
         self.script_root = script_root
         self.log = []
         self.log_root = log_root
@@ -30,6 +30,7 @@ class myLogAnalysis(object):
         self.FieldNum = 0
         self.test_result = True
         self.modelName = ModelName
+        self.needResetPath = NeedRestPath
 
     def _load(self):
         loadfile = self.logfile.encode(sys.getfilesystemencoding()) if not PY3 else self.logfile
@@ -74,7 +75,8 @@ class myLogAnalysis(object):
             self.test_result = False
             self.FieldNum = self.FieldNum +1
 
-        self.resetScreen(screen,self.modelName)
+        if self.needResetPath:
+            self.resetScreen(screen,self.modelName)
         translated = {
             "title": title,
             "time": step["time"],
@@ -282,6 +284,17 @@ class myLogAnalysis(object):
         else:
             return None
 
+    @staticmethod
+    def div_rect(r):
+        """count rect for js use"""
+        xs = [p[0] for p in r]
+        ys = [p[1] for p in r]
+        left = min(xs)
+        top = min(ys)
+        w = max(xs) - left
+        h = max(ys) - top
+        return {'left': left, 'top': top, 'width': w, 'height': h}
+
     @classmethod
     def get_small_name(cls, filename):
         name, ext = os.path.splitext(filename)
@@ -303,8 +316,10 @@ class myLogAnalysis(object):
         records = [os.path.join(LOGDIR, f) if self.export_dir
                    else os.path.abspath(os.path.join(self.log_root, f)) for f in record_list]
 
-        scriptname = self.splitPath(self.script_root,self.modelName)
-        info['path'] = self.splitPath(info['path'],self.modelName)
+        scriptname = self.script_name
+        if self.needResetPath:
+            scriptname = self.splitPath(self.script_root,self.modelName)
+            info['path'] = self.splitPath(info['path'],self.modelName)
 
         data = {}
         data['steps'] = steps
