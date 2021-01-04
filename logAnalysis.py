@@ -22,8 +22,22 @@ PY3 = sys.version_info[0] == 3
 LOGGING = get_logger(__name__)
 LOGDIR = "log"
 
+def getModelAir(CaseName,root_dir):
+    for f in os.listdir(root_dir):
+        if f.endswith(".air"):
+            temp = f.split('.')
+            if(temp[0] == CaseName):
+                return f,None
+        else:
+            dir = os.path.join(root_dir,f)
+            for newf in os.listdir(dir):
+                if newf.endswith(".air"):
+                    temp = newf.split('.')
+                    if (temp[0] == CaseName):
+                        return newf,f
+
 class myLogAnalysis(object):
-    def __init__(self,script_root,log_root,logfile,ModelName,NeedRestPath):
+    def __init__(self,script_root,log_root,logfile,CaseName,NeedRestPath):
         self.script_root = script_root
         self.log = []
         self.log_root = log_root
@@ -32,7 +46,7 @@ class myLogAnalysis(object):
         self.export_dir = None
         self.FieldNum = 0
         self.test_result = True
-        self.modelName = ModelName
+        self.caseName = CaseName
         self.needResetPath = NeedRestPath
 
     def _load(self):
@@ -78,8 +92,8 @@ class myLogAnalysis(object):
             self.test_result = False
             self.FieldNum = self.FieldNum +1
 
-        if self.needResetPath:
-            self.resetScreen(screen,self.modelName)
+        if self.needResetPath and screen != None:
+            self.resetScreen(screen,self.caseName)
         translated = {
             "title": title,
             "time": step["time"],
@@ -142,13 +156,13 @@ class myLogAnalysis(object):
                 arg["resolution"] = get_resolution(crop_img)
         return code
 
-    def resetScreen(self,screen,ModelName):
-        screen['src'] = self.splitPath(screen['src'],ModelName)
-        screen['_filepath'] = self.splitPath(screen['_filepath'], ModelName)
-        screen['thumbnail'] = self.splitPath(screen['thumbnail'], ModelName)
+    def resetScreen(self,screen,CaseName):
+        screen['src'] = self.splitPath(screen['src'],CaseName)
+        screen['_filepath'] = self.splitPath(screen['_filepath'], CaseName)
+        screen['thumbnail'] = self.splitPath(screen['thumbnail'], CaseName)
 
-    def splitPath(self,str,modelName):
-        s = str.split(modelName)
+    def splitPath(self,str,caseName):
+        s = str.split(caseName)
         return str.replace(s[0], "")
 
     def _translate_desc(self,step,code):
@@ -321,8 +335,8 @@ class myLogAnalysis(object):
 
         scriptname = self.script_name
         if self.needResetPath:
-            scriptname = self.splitPath(self.script_root,self.modelName)
-            info['path'] = self.splitPath(info['path'],self.modelName)
+            scriptname = self.splitPath(self.script_root,self.caseName)
+            info['path'] = self.splitPath(info['path'],self.caseName)
 
         data = {}
         data['steps'] = steps
@@ -341,36 +355,46 @@ class myLogAnalysis(object):
         # data['data'] = info
         return data
 
-def MakeAllReport(ModelList, script_root, log_Root, savePath):
+def MakeAllReport(CaseList, script_root, log_Root, savePath):
     reportPath = savePath + "/Report/"
-    modellist = json.loads(ModelList)
-    for model in modellist:
-        modelName = model['modelName']
-        script = os.path.join(script_root, modelName + '.air')
-        logroot = os.path.join(log_Root, modelName)
+    caselist = json.loads(CaseList)
+    for case in caselist:
+        caseName = case['caseName']
+        f,UpModel = getModelAir(caseName,script_root)
+        airPath = f
+        if UpModel != None:
+            airPath = os.path.join(UpModel, f)
+        script = os.path.join(script_root, airPath)
+        logroot = os.path.join(log_Root, caseName)
         os.system("airtest report %s --log_root %s --outfile log.html --lang zh --export %s" % (script,
                                                                                                     logroot, reportPath))
 
-
-def MakeAllLogData(ModelList,script_root,log_Root,savePath):
+def MakeAllLogData(CaseList,script_root,log_Root,savePath):
 
     results = [];
     mark = {}
     mark["AllPass"] = True
-    mark["LastModel"] = ""
-    for model in ModelList:
-        modelName = model['modelName']
-        mark["LastModel"] = modelName
-        script = os.path.join(script_root,modelName + '.air')
-        log = os.path.join(log_Root,modelName)
+    mark["LastCase"] = ""
+    for case in CaseList:
+        caseName = case['caseName']
+        mark["LastCase"] = caseName
+
+        f, UpModel = getModelAir(caseName, script_root)
+        airPath = f
+        if UpModel != None:
+            airPath = os.path.join(UpModel, f)
+        airPath = os.path.join(UpModel, f)
+        script = os.path.join(script_root, airPath)
+
+        log = os.path.join(log_Root,caseName)
         if os.path.exists(log+"/log.txt"):
-            sda = myLogAnalysis(script, log, "log.txt",modelName)
+            sda = myLogAnalysis(script, log, "log.txt",caseName)
             ss = sda.makeData()
             data = {};
-            data['name'] = modelName
+            data['name'] = caseName
             data['result'] = ss['test_result']
             data['infos'] = ss
-            data['mustPass'] = model['MustPass']
+            data['mustPass'] = case['MustPass']
 
             if data['mustPass'] and data['result'] == False:
                 mark["AllPass"] = False
@@ -382,7 +406,6 @@ def MakeAllLogData(ModelList,script_root,log_Root,savePath):
     datas = {}
     datas["mark"] = mark
     datas["results"] = results
-        # data[model] = ss
     data = json.dumps(datas)
     saveFile = os.path.join(savePath,"data.json")
     WriteInFile(saveFile,data)

@@ -1,6 +1,6 @@
 #! /usr/bin/env python3.6
 #coding=utf-8
-
+import os
 import subprocess
 import threading
 import time
@@ -9,13 +9,15 @@ from enum import Enum
 
 import grpc
 
+
 from . import perfdog_pb2, perfdog_pb2_grpc
 
 class SaveFormat(Enum):
     NONE = 0,
     JSON = 1,
     PB = 2,
-    ALL = 3,
+    EXCEL = 3,
+    ALL = 4,
 
 class PerfdogService():
     packageName = ''
@@ -91,18 +93,25 @@ class PerfdogService():
             apps = appList.app
             app = self.selectApp(apps)
             if app == None:
-                raise "未获取 %s 信息" % self.packageName
+                raise Exception("未获取 "+self.packageName+" 信息")
+
             print("7.获取设备的详细信息")
             deviceInfo = self.stub.getDeviceInfo(self.device)
+            print("deviceInfo")
+            print(deviceInfo)
+            # self.stub.setGlobalDataUploadServer(perfdog_pb2.SetDataUploadServerReq(serverUrl="http://127.0.0.1:80/",dataUploadFormat=perfdog_pb2.JSON))
+
             print("8.开启性能数据项")
             self.stub.enablePerfDataType(
                 perfdog_pb2.EnablePerfDataTypeReq(device=self.device, type=perfdog_pb2.NETWORK_USAGE))
+            self.stub.enablePerfDataType(
+                perfdog_pb2.EnablePerfDataTypeReq(device=self.device, type=perfdog_pb2.SCREEN_SHOT))
             print("9.开始收集[%s:%s]的性能数据\n" % (app.label, app.packageName))
-
+            # self.stub.setScreenShotInterval(1)
             print(self.stub.startTestApp(perfdog_pb2.StartTestAppReq(device=self.device, app=app)))
 
-            req = perfdog_pb2.OpenPerfDataStreamReq(device=self.device)
-            perfDataIterator = self.stub.openPerfDataStream(req)
+            # req = perfdog_pb2.OpenPerfDataStreamReq(device=self.device)
+            # perfDataIterator = self.stub.openPerfDataStream(req)
 
             # def perf_data_process():
             #     for perfData in perfDataIterator:
@@ -159,6 +168,17 @@ class PerfdogService():
                     dataExportFormat=perfdog_pb2.EXPORT_TO_PROTOBUF
                 ))
                 print("保存结果----PB:\n", saveResult)
+
+                print("12.%s ----Excel" % str)
+                saveResult = self.stub.saveData(perfdog_pb2.SaveDataReq(
+                    device=self.device,
+                    caseName=self.caseName,  # web上case和excel的名字
+                    uploadToServer=self.uploadServer,  # 上传到perfdog服务器
+                    exportToFile=True,  # 保存到本地
+                    outputDirectory=self.saveJsonPath,
+                    dataExportFormat=perfdog_pb2.EXPORT_TO_EXCEL
+                ))
+                print("保存结果 ----JSON :\n", saveResult)
             else:
                 if self.saveformat == SaveFormat.JSON:
                     print("12.%s ----JSON" % str)
@@ -182,18 +202,33 @@ class PerfdogService():
                         dataExportFormat=perfdog_pb2.EXPORT_TO_PROTOBUF
                     ))
                     print("保存结果----PB:\n", saveResult)
+                if self.saveformat == SaveFormat.EXCEL:
+                    print("12.%s ----Excel" % str)
+                    saveResult = self.stub.saveData(perfdog_pb2.SaveDataReq(
+                        device=self.device,
+                        caseName=self.caseName,  # web上case和excel的名字
+                        uploadToServer=self.uploadServer,  # 上传到perfdog服务器
+                        exportToFile=True,  # 保存到本地
+                        outputDirectory=self.saveJsonPath,
+                        dataExportFormat=perfdog_pb2.EXPORT_TO_EXCEL
+                    ))
+                    print("保存结果 ----JSON :\n", saveResult)
+
+                self.uploadServer = False
+
+
         except Exception as e:
             traceback.print_exc()
 
     def StopPerf(self):
         try:
-
             if self.saveformat != SaveFormat.NONE:
                 self.SaveJSON()
             else:
                 print("保存格式为NONE 不保存为文件")
             print("13.停止测试")
             self.stub.stopTest(perfdog_pb2.StopTestReq(device=self.device))
+            self.stub.killServer()
             print("over")
         except Exception as e:
             traceback.print_exc()

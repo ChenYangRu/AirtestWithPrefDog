@@ -3,17 +3,19 @@
 
 import json
 from enum import Enum
+from time import sleep
 
 from airtest.cli.runner import AirtestCase, run_script
 from argparse import *
 
 from airtest.core.api import stop_app, start_app, connect_device
-
-from .logAnalysis import myLogAnalysis, MakeAllLogData
+from airtest.core.helper import G
+from .logAnalysis import myLogAnalysis, MakeAllLogData, getModelAir
 import os
 import shutil
 
 from .startService import PerfdogService, SaveFormat
+from .MakePrefData import MakeReportData
 
 
 class PlatForm(Enum):
@@ -29,25 +31,18 @@ class airRunner(AirtestCase):
         print("My testDown")
         super(airRunner, self).setUp()
 
-    def getModelAir(self,modelName,root_dir):
-        for f in os.listdir(root_dir):
-            if f.endswith(".air"):
-                temp = f.split('.')
-                if(temp[0] == modelName):
-                    return f
     def stopApp(self,package,device):
-        from airtest.core.helper import G
         if G.DEVICE == None:
             connect_device(device)
         stop_app(package)
 
+
     def startApp(self,package,device):
-        from airtest.core.helper import G
         if G.DEVICE == None:
             connect_device(device)
         start_app(package)
 
-    def run_air(self,root_script,log_root,ModelList,device,prefObj = None,runPref = False,resetpath = False):
+    def run_air(self,root_script,log_root,CaseList,device,prefObj = None,runPref = False,resetpath = False):
         # param  root_dir  脚本集合根目录
         # param  device    设备列表
 
@@ -64,19 +59,22 @@ class airRunner(AirtestCase):
 
         mark = {}
         mark["AllPass"] = True
-        mark["LastModel"] = ""
+        mark["LastCase"] = ""
 
         args = None
-        for model in ModelList:
-            print("model : ",model)
-            modelName = model['modelName']
-            mark["LastModel"] = modelName
-            f = self.getModelAir(modelName,root_script)
+        for case in CaseList:
+            caseName = case['caseName']
+            mark["LastCase"] = caseName
+            f,UpModel = getModelAir(caseName,root_script)
             if runPref and prefObj:
-                prefObj.setlabel(modelName)
+                prefObj.setlabel(caseName)
 
             airName = f
-            script = os.path.join(root_script,f)
+            airPath = f
+            if UpModel != None:
+                airPath = os.path.join(UpModel,f)
+
+            script = os.path.join(root_script,airPath)
 
             log = os.path.join(log_root,airName.replace('.air',''))
             if os.path.isdir(log):
@@ -95,17 +93,19 @@ class airRunner(AirtestCase):
             except:
                 pass
             finally:
-                mylog = myLogAnalysis(script,log,"log.txt",modelName,resetpath)
+                mylog = myLogAnalysis(script,log,"log.txt",caseName,resetpath)
                 datas = mylog.makeData()
                 result = {}
-                result['name'] = airName.replace('.air','')
+                if UpModel != None:
+                    result['Modelname'] = UpModel
+                result['Casename'] = airName.replace('.air','')
                 result['result'] = datas['test_result']
                 result['infos'] = datas
-                result['mustPass'] = model['MustPass']
+                result['mustPass'] = case['MustPass']
                 results.append(result)
                 print("Result :  ",result['result'])
-                if model['MustPass'] == True and result['result'] == False :
-                    print("当前模块 【%s】 未通过 后续模块不执行" % modelName)
+                if case['MustPass'] == True and result['result'] == False :
+                    print("当前用例 【%s】 未通过 后续用例不执行" % caseName)
                     mark["AllPass"] = False
                     data = {}
                     data["mark"] = mark
@@ -123,7 +123,7 @@ class myAirRunner():
     device = ""
     deviceUUid = ""
     perfDogLogPath = ""
-    modelList = []
+    caseList = []
     airtestLogRoot = ""
     airtestScriptRoot = ""
     resetPath = False
@@ -170,16 +170,16 @@ class myAirRunner():
 
         return ""
 
-    def RunAirWithModelList(self,ModelList,PerfTestName,SaveLogFile ,runPerf,perfdogSaveFormat=SaveFormat.ALL,perfDogUploadServer = True):
+    def RunAirWithCaseList(self,CaseList,PerfTestName,SaveLogFile ,runPerf,perfdogSaveFormat=SaveFormat.ALL,perfDogUploadServer = True):
         """
-        :param ModelList: 需要运行的测试模块JSON 数据
+        :param CaseList: 需要运行的测试模块JSON 数据
         :param PerfTestName: 性能测试的测试名称
         :param SaveLogFile: 是否需要保存airtest 测试文本数据
         :param runPerf: 是否运行性能狗测试
         :param perfdogSaveFormat: 性能狗测试数据保存格式
         :param perfDogUploadServer: 性能狗测试数据是否上传性能狗网站
         """
-        self.modelList = json.loads(ModelList)
+        self.caseList = json.loads(CaseList)
 
         if runPerf:
             err = self.CheckPrefInit()
@@ -188,34 +188,33 @@ class myAirRunner():
                 self.perfObj.initService()
                 self.perfObj.startPerf()
             else:
-                raise "无法进行性能测试 ："+err
+                raise Exception("无法进行性能测试 ："+err)
 
         Runner = airRunner()
-
         Runner.stopApp(self.package,self.device)
         Runner.startApp(self.package,self.device)
 
-        results,ErrOut = Runner.run_air(self.airtestScriptRoot,self.airtestLogRoot,self.modelList,self.device,self.perfObj,runPerf,self.resetPath)
+        results,ErrOut = Runner.run_air(self.airtestScriptRoot,self.airtestLogRoot,self.caseList,self.device,self.perfObj,runPerf,self.resetPath)
         if runPerf:
             self.perfObj.StopPerf()
+            saveJsonPath = os.path.abspath(os.path.join(os.path.dirname(self.perfDogLogPath), "ReportResult.json"))
+            PerFDogLogFile = os.path.abspath(os.path.join(self.perfDogLogPath,PerfTestName+".json"))
+            print("RepostResult.json path : ", saveJsonPath)
+            MakeReportData(PerFDogLogFile, saveJsonPath)
+
         data = json.dumps(results)
         if SaveLogFile:
             saveFile = os.path.join(self.airtestLogRoot, "Resultdata.json")
             with open(saveFile, 'w') as f:
                 f.write(data)
             f.close()
-
-            #MakeAllLogData(self.modelList, self.airtestScriptRoot, self.airtestLogRoot,self.airtestLogRoot)
             print("AirtestLogPath: ",self.airtestLogRoot)
-
         if runPerf:
             print("prefDogLogPath: ", self.perfDogLogPath)
 
         print("Test Over")
         print("ErrOut :  ",ErrOut)
-
-        if ErrOut:
-            Runner.stopApp(self.package,self.device)
+        Runner.stopApp(self.package,self.device)
 
 
 if __name__ == "__main__":
@@ -227,11 +226,11 @@ if __name__ == "__main__":
 
     airtestLogRoot = "C:/Work/airtest/MytestReport/"
     airtestScriptRoot ="C:/Work/airtest/fangzhidalu/"
-    ModelList = ['Login', 'runChallenge', 'stopGame']
+    CaseList = ['Login', 'runChallenge', 'stopGame']
 
     # myRunner = myAirRunner(package,device,airtestLogRoot,airtestScriptRoot,True,path,token,prefDogLogPath)
-    # myRunner.RunAirWithModelList(ModelList,"MyAirtestName")
+    # myRunner.RunAirWithCaseList(CaseList,"MyAirtestName")
 
 
-    MakeAllLogData(ModelList, airtestScriptRoot, airtestLogRoot, airtestLogRoot)
+    MakeAllLogData(CaseList, airtestScriptRoot, airtestLogRoot, airtestLogRoot)
 
