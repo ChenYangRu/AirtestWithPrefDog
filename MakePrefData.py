@@ -2,7 +2,6 @@ import json
 
 
 def openJSON(jsonPath):
-    print("jsonPath ++++++++++++++++++    ",jsonPath)
     with open(jsonPath, 'r', encoding='utf-8') as fp:
         jsonData = json.load(fp)
     return jsonData
@@ -95,7 +94,7 @@ def GetPerfData(JsonData):
                           "fps": fps,
                           "jank": jank,
                           "bigjank": bigjank,
-                          "framtTime": frameTime,
+                          "frameTime": frameTime,
                           "AppCPU": AppCPU,
                           "TotalCPU": TotalCPU,
                           "NormalAppCPU": NormalAppCPU,

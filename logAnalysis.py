@@ -360,6 +360,9 @@ def MakeAllReport(CaseList, script_root, log_Root, savePath):
     caselist = json.loads(CaseList)
     for case in caselist:
         caseName = case['caseName']
+        if '/' in caseName:
+            caseName = caseName.split('/')[1]
+
         f,UpModel = getModelAir(caseName,script_root)
         airPath = f
         if UpModel != None:

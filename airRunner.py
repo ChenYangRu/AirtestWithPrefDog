@@ -40,7 +40,34 @@ class airRunner(AirtestCase):
     def startApp(self,package,device):
         if G.DEVICE == None:
             connect_device(device)
-        start_app(package)
+        print("start_app(package)")
+        print(start_app(package))
+
+    def getUnrunCase(self,nowIndex,CaseList):
+        if nowIndex >= len(CaseList):
+            return None
+        else :
+            unrunList = []
+            for case in CaseList[nowIndex:]:
+                unrunList.append(case)
+            return unrunList
+
+    def makeUnrunData(self,unrunlist):
+        unRunData = []
+        if unrunlist != None and len(unrunlist) > 0:
+            for case in unrunlist:
+                caseName = case['caseName']
+                model = ""
+                case = caseName
+                if '/' in caseName:
+                    caseinfo = caseName.split('/')
+                    model = caseinfo[0]
+                    case = caseinfo[1]
+                data = {'model':model,'case':case}
+                unRunData.append(data)
+        return unRunData
+
+
 
     def run_air(self,root_script,log_root,CaseList,device,prefObj = None,runPref = False,resetpath = False):
         # param  root_dir  脚本集合根目录
@@ -51,21 +78,32 @@ class airRunner(AirtestCase):
         #日志目录
         #root_log = root_dir+'\\'+'log'
         root_log = log_root
-        if os.path.isdir(root_log):
-            shutil.rmtree(root_log)
-        else:
-            os.makedirs(root_log)
-            print(str(root_log) + 'is created')
-
+        if os.path.exists(root_log):
+            if os.path.isdir(root_log):
+                shutil.rmtree(root_log)
+        #     else:
+        #         os.makedirs(root_log)
+        #         print(str(root_log) + 'is created')
+        #
+        # os.makedirs(root_log)
+        # print(str(root_log) + 'is created')
         mark = {}
         mark["AllPass"] = True
         mark["LastCase"] = ""
-
         args = None
+        indx = 0
         for case in CaseList:
             caseName = case['caseName']
+            if '/' in caseName:
+                caseName = caseName.split('/')[1]
+
+            if '.air' in caseName:
+                caseName = caseName.replace('.air','')
+
             mark["LastCase"] = caseName
+            print("CaseName: ",caseName)
             f,UpModel = getModelAir(caseName,root_script)
+
             if runPref and prefObj:
                 prefObj.setlabel(caseName)
 
@@ -101,20 +139,32 @@ class airRunner(AirtestCase):
                 result['Casename'] = airName.replace('.air','')
                 result['result'] = datas['test_result']
                 result['infos'] = datas
-                result['mustPass'] = case['MustPass']
+                result['mustPass'] = case['mustPass']
                 results.append(result)
                 print("Result :  ",result['result'])
-                if case['MustPass'] == True and result['result'] == False :
+                indx = indx + 1
+                if case['mustPass'] == True and result['result'] == False :
                     print("当前用例 【%s】 未通过 后续用例不执行" % caseName)
                     mark["AllPass"] = False
+                    print("UnrunCase list :")
+                    unrun = self.makeUnrunData(self.getUnrunCase(indx, CaseList))
+                    mark["unrun"] = unrun
                     data = {}
                     data["mark"] = mark
                     data["results"] = results
                     return data,True;
+
+
+
+        print("UnrunCase list :")
+        unrun = self.makeUnrunData(self.getUnrunCase(indx, CaseList))
+        mark["unrun"] = unrun
         data = {}
         data["mark"] = mark
         data["results"] = results
         return data,False;
+
+
 
 class myAirRunner():
     package = ""
@@ -192,6 +242,7 @@ class myAirRunner():
 
         Runner = airRunner()
         Runner.stopApp(self.package,self.device)
+        sleep(3)
         Runner.startApp(self.package,self.device)
 
         results,ErrOut = Runner.run_air(self.airtestScriptRoot,self.airtestLogRoot,self.caseList,self.device,self.perfObj,runPerf,self.resetPath)
