@@ -30,11 +30,12 @@ def getModelAir(CaseName,root_dir):
                 return f,None
         else:
             dir = os.path.join(root_dir,f)
-            for newf in os.listdir(dir):
-                if newf.endswith(".air"):
-                    temp = newf.split('.')
-                    if (temp[0] == CaseName):
-                        return newf,f
+            if os.path.isdir(dir):
+                for newf in os.listdir(dir):
+                    if newf.endswith(".air"):
+                        temp = newf.split('.')
+                        if (temp[0] == CaseName):
+                            return newf,f
 
 class myLogAnalysis(object):
     def __init__(self,script_root,log_root,logfile,CaseName,NeedRestPath):
@@ -61,7 +62,6 @@ class myLogAnalysis(object):
         children_steps =[]
         for log in self.log:
             depth = log['depth']
-
             if not self.run_start:
                 self.run_start = log.get('data',{}).get('start_time','') or log["time"]
             self.run_end = log["time"]
@@ -72,6 +72,7 @@ class myLogAnalysis(object):
                 step = deepcopy(log)
                 step["__children__"] = children_steps
                 steps.append(step)
+                children_steps = []
             else:
                 children_steps.insert(0,log)
 
@@ -420,11 +421,10 @@ def WriteInFile(file,data):
 
 if __name__ == "__main__":
 
-    script_root = "C:/Work/airtest/mytest.air"
-    logRoot = "C:/Work/airtestReport/Log/mytest/"
+    script_root = "C:/Work/agentWorkspace/FZDL/fangzhidalu/登录/login.air"
+    logRoot = "C:/Work/agentWorkspace/FZDL/com.ztgame.fzdl.guanbao/AutoTestReport/airtestLog/login"
     logFile = "log.txt"
-
-    sda = myLogAnalysis(script_root,logRoot,logFile)
+    sda = myLogAnalysis(script_root,logRoot,logFile,"login",False)
 
     #sda._load()
 

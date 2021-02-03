@@ -34,6 +34,8 @@ def GetPerfData(JsonData):
 
         isDelete = []
 
+        obj = {}
+
         for data in DataList:
             TimeStamp = int(data["TimeStamp"])
             if TimeStamp >= startTime and TimeStamp < endTime:
@@ -110,6 +112,78 @@ def GetPerfData(JsonData):
                           }
     return PerfData
 
+def GetPerfDataDict(JsonData):
+    LabelList = JsonData["LabelList"]
+    DataList = JsonData["DataList"]
+    PerfData = {}
+    PerfDt = {}
+    for v in LabelList:
+        startTime = int(v["StartTime"])
+        endTime = int(v["EndTime"])
+        Text = v["Text"]
+
+        dt = []
+        for data in DataList:
+            TimeStamp = int(data["TimeStamp"])
+            if TimeStamp >= startTime and TimeStamp < endTime:
+                tempfps = '%.1f' % data["AndroidFps"]["fps"]
+                tempjank = data["AndroidFps"]["Jank"]
+                tempBigJank = data["BigJank"]["BigJank"]
+                frametime = []
+                if data.get("FrameDetails") != None and data["FrameDetails"].get("FrameTimes") != None:
+                    t0 = data["FrameDetails"]["FrameTimes"]
+                    for t in t0:
+                        frametime.append('%.1f' % t)
+
+                # CPU
+                tempAppCPU = '%.1f' % float(data["CpuUsage"]["AppUsage"])
+                tempTotalCPU = '%.1f' % float(data["CpuUsage"]["TotalUsage"])
+                tempNormalAppCPU = '%.1f' % float(data["NormalizedCpuUsage"]["AppUsage"])
+                tempNormalTotalCPU = '%.1f' % float(data["NormalizedCpuUsage"]["TotalUsage"])
+                tempCPUTemp = '%.1f' % float(data["CpuTemperature"]["CpuTemperature"])
+
+                # Memory
+                tempMemory = data["AndroidMemoryUsage"]["Memory"]
+                tempSwapMemory = data["AndroidMemoryUsage"]["SwapMemory"]
+                tempVirtualMemory = data["VirtualMemory"]["VirtualMemory"]
+
+                # screenShot
+                tempScreenShot = ""
+                if data.get("ScreenShot") != None and data["ScreenShot"].get("FileName") != None:
+                    tempScreenShot = data["ScreenShot"]["FileName"]
+
+                # Network
+                tempUpSpeed = '%.5f' % data["NetworkUsage"]["UpSpeed"]
+                tempDownSpeed = '%.5f' % data["NetworkUsage"]["DownSpeed"]
+
+                tempIsDelete = data["IsDelete"]
+
+                tdt = {"TimeStamp": TimeStamp,
+                      "fps": tempfps,
+                      "jank": tempjank,
+                      "bigjank": tempBigJank,
+                      "frameTime": frametime,
+                      "AppCPU": tempAppCPU,
+                      "TotalCPU": tempTotalCPU,
+                      "NormalAppCPU": tempNormalAppCPU,
+                      "NormalTotalCPU": tempNormalTotalCPU,
+                      "CTemp": tempCPUTemp,
+                      "Memory": tempMemory,
+                      "SwapMemory": tempSwapMemory,
+                      "VirtualMemory": tempVirtualMemory,
+                      "ScreenShot": tempScreenShot,
+                      "UpSpeed": tempUpSpeed,
+                      "DownSpeed": tempDownSpeed,
+                      "IsDelete": tempIsDelete
+                      }
+                dt.append(tdt)
+
+        PerfData[Text] = {"startTime": startTime,
+                          "endTime": endTime,
+                          "data" : dt
+                          }
+    return PerfData
+
 def GetAPPInfo(JsonData):
 
     DeviceModel = JsonData["DeviceModel"]
@@ -170,7 +244,7 @@ def WriteInFile(file,data):
 
 
 if __name__ == '__main__':
-    MakeReportData("C:/Work/QA/dapbatu/daobatuautotestscript/AutoTestReport/prefDogLog/MyAirtestName.json","C:/Work/QA/dapbatu/daobatuautotestscript/AutoTestReport/prefDogLog/ReportResult.json")
+    MakeReportData("C:/Work/QA/dapbatu/daobatuautotestscript/AutoTestReport/prefDogLog/流水线启动测试.json","C:/Work/QA/dapbatu/daobatuautotestscript/AutoTestReport/prefDogLog/ReportResult.json")
     # t = openJSON("Temp.json")
 
     # print(t['AppInfo'])
